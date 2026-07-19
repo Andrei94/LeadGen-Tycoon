@@ -1,0 +1,2 @@
+"""LeadGen Tycoon game package."""
+

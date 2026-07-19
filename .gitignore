@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+*.pyo
+
+.streamlit/secrets.toml
+.venv/
+venv/
+env/
+
+.idea/
+*.iml
+
+.agents/
+.codex/
+
+leadgen_tycoon/saves/*
+!leadgen_tycoon/saves/.gitkeep
