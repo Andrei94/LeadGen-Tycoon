@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 from html import escape
 import socket
 from pathlib import Path
@@ -16,6 +17,11 @@ from game.persistence import DB_PATH, JSON_FALLBACK_PATH, delete_save, load_game
 from game.simulation import estimate_campaign_cost, simulate_week
 from game.state import new_game, normalize_state, refresh_business_metrics
 from game.tools import TOOLS, buy_tool, cancel_tool, monthly_tool_cost
+
+
+APP_DIR = Path(__file__).resolve().parent
+ASSET_DIR = APP_DIR / "assets"
+COMMAND_CENTER_ASSET = ASSET_DIR / "agency-command-center.png"
 
 
 NAV_ITEMS = [
@@ -95,6 +101,14 @@ EFFECT_LABELS = {
 }
 
 
+def image_data_uri(path: Path) -> str:
+    try:
+        encoded = base64.b64encode(path.read_bytes()).decode("ascii")
+        return f"data:image/png;base64,{encoded}"
+    except OSError:
+        return ""
+
+
 st.set_page_config(
     page_title="LeadGen Tycoon",
     page_icon="LG",
@@ -103,15 +117,21 @@ st.set_page_config(
 )
 
 
+COMMAND_CENTER_URI = image_data_uri(COMMAND_CENTER_ASSET)
+
+
 CSS = """
 <style>
     :root {
-        --lg-bg: #f5f7fb;
+        --lg-bg: #eef3f8;
         --lg-surface: #ffffff;
         --lg-ink: #1d2430;
         --lg-muted: #657184;
         --lg-line: #dbe2ea;
         --lg-teal: #0f9f8c;
+        --lg-coral: #ff4e4e;
+        --lg-gold: #f5b841;
+        --lg-navy: #111a27;
         --lg-green: #1f9d55;
         --lg-amber: #b7791f;
         --lg-red: #c53030;
@@ -122,12 +142,16 @@ CSS = """
     [data-testid="stAppViewContainer"],
     [data-testid="stMain"],
     section.main {
-        background: var(--lg-bg) !important;
+        background:
+            radial-gradient(circle at 16% 0%, rgba(15, 159, 140, 0.12), transparent 28rem),
+            radial-gradient(circle at 90% 8%, rgba(245, 184, 65, 0.14), transparent 30rem),
+            linear-gradient(180deg, #f4f8fc 0%, #edf3f8 44%, #f7f9fc 100%) !important;
         color: var(--lg-ink) !important;
     }
     [data-testid="stHeader"] {
-        background: rgba(245, 247, 251, 0.94) !important;
-        border-bottom: 1px solid rgba(219, 226, 234, 0.7);
+        background: rgba(244, 248, 252, 0.88) !important;
+        border-bottom: 1px solid rgba(219, 226, 234, 0.72);
+        backdrop-filter: blur(14px);
     }
     .block-container {
         padding-top: 1.4rem;
@@ -145,7 +169,10 @@ CSS = """
         letter-spacing: 0;
     }
     [data-testid="stSidebar"] {
-        background: #17212f;
+        background:
+            linear-gradient(180deg, rgba(17, 26, 39, 0.95), rgba(24, 35, 50, 0.98)),
+            radial-gradient(circle at 50% 0%, rgba(15, 159, 140, 0.22), transparent 18rem);
+        border-right: 1px solid rgba(232, 238, 247, 0.12);
     }
     [data-testid="stSidebar"] h1,
     [data-testid="stSidebar"] h2,
@@ -161,6 +188,9 @@ CSS = """
         border-radius: 8px;
         padding: 2px 4px;
     }
+    [data-testid="stSidebar"] [role="radiogroup"] label:hover {
+        background: rgba(255, 255, 255, 0.08);
+    }
     .lg-sidebar-kpis {
         display: grid;
         grid-template-columns: 1fr;
@@ -168,10 +198,11 @@ CSS = """
         margin: 14px 0 18px;
     }
     .lg-sidebar-kpi {
-        background: #223044;
-        border: 1px solid rgba(232, 238, 247, 0.12);
+        background: linear-gradient(180deg, rgba(34, 48, 68, 0.92), rgba(25, 37, 54, 0.96));
+        border: 1px solid rgba(232, 238, 247, 0.14);
         border-radius: 8px;
         padding: 12px 14px;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 10px 22px rgba(0, 0, 0, 0.12);
     }
     .lg-sidebar-kpi span {
         display: block;
@@ -211,18 +242,94 @@ CSS = """
         box-shadow: 0 0 0 3px rgba(15, 159, 140, 0.20) !important;
     }
     .lg-page-title {
+        position: relative;
         display: flex;
         justify-content: space-between;
         align-items: flex-start;
         gap: 16px;
-        margin-bottom: 12px;
+        min-height: 238px;
+        margin-bottom: 18px;
+        padding: 26px;
+        border-radius: 14px;
+        overflow: hidden;
+        color: #ffffff;
+        background:
+            linear-gradient(90deg, rgba(12, 18, 27, 0.95) 0%, rgba(12, 18, 27, 0.82) 38%, rgba(12, 18, 27, 0.28) 100%),
+            url("__COMMAND_CENTER_URI__");
+        background-size: cover;
+        background-position: center;
+        border: 1px solid rgba(15, 159, 140, 0.26);
+        box-shadow: 0 22px 50px rgba(15, 23, 42, 0.22);
+    }
+    .lg-page-title::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(180deg, transparent 60%, rgba(5, 10, 18, 0.42) 100%);
+        pointer-events: none;
+    }
+    .lg-page-title > * {
+        position: relative;
+        z-index: 1;
     }
     .lg-page-title h1 {
         margin: 0;
-        font-size: 2rem;
+        max-width: 720px;
+        font-size: clamp(2rem, 4vw, 3.8rem);
         line-height: 1.1;
         letter-spacing: 0;
-        color: var(--lg-ink);
+        color: #ffffff;
+        text-shadow: 0 8px 26px rgba(0, 0, 0, 0.28);
+    }
+    .lg-page-title .lg-subtle,
+    .lg-page-title p {
+        max-width: 620px;
+        color: #d8e4f4 !important;
+    }
+    .lg-hero-eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 12px;
+        padding: 6px 10px;
+        border-radius: 999px;
+        background: rgba(15, 159, 140, 0.18);
+        border: 1px solid rgba(95, 230, 207, 0.36);
+        color: #dffdf6;
+        font-size: 0.76rem;
+        font-weight: 800;
+        text-transform: uppercase;
+    }
+    .lg-week-card {
+        min-width: 178px;
+        padding: 14px 15px;
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.92);
+        color: #1d2430;
+        border: 1px solid rgba(255, 255, 255, 0.62);
+        box-shadow: 0 16px 34px rgba(0, 0, 0, 0.24);
+    }
+    .lg-week-card .lg-small-label {
+        color: #617089;
+    }
+    .lg-week-card strong {
+        display: block;
+        margin: 5px 0 3px;
+        font-size: 1.75rem;
+        line-height: 1;
+    }
+    .lg-xp-track {
+        height: 8px;
+        margin-top: 10px;
+        border-radius: 999px;
+        background: #dce6f0;
+        overflow: hidden;
+    }
+    .lg-xp-track span {
+        display: block;
+        height: 100%;
+        border-radius: inherit;
+        background: linear-gradient(90deg, #0f9f8c, #f5b841);
     }
     .lg-subtle {
         color: var(--lg-muted);
@@ -230,11 +337,12 @@ CSS = """
         line-height: 1.45;
     }
     .lg-panel {
-        background: #ffffff;
-        border: 1px solid #dbe2ea;
-        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.94);
+        border: 1px solid rgba(201, 212, 226, 0.9);
+        border-radius: 10px;
         padding: 16px;
         margin-bottom: 12px;
+        box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
     }
     .lg-callout {
         background: #edfdf8;
@@ -265,19 +373,51 @@ CSS = """
         display: grid;
         grid-template-columns: repeat(4, minmax(0, 1fr));
         gap: 12px;
-        margin: 10px 0 18px;
+        margin: 10px 0 20px;
     }
     .lg-kpi {
-        background: #ffffff;
-        border: 1px solid #dbe2ea;
-        border-radius: 8px;
+        position: relative;
+        overflow: hidden;
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(249, 252, 255, 0.96));
+        border: 1px solid rgba(201, 212, 226, 0.95);
+        border-radius: 12px;
         padding: 14px 15px;
-        min-height: 92px;
+        min-height: 104px;
+        box-shadow: 0 12px 24px rgba(15, 23, 42, 0.06);
+    }
+    .lg-kpi::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 5px;
+        background: linear-gradient(180deg, #0f9f8c, #f5b841);
+    }
+    .lg-kpi-top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        margin-bottom: 6px;
+    }
+    .lg-kpi-code {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 34px;
+        height: 34px;
+        border-radius: 9px;
+        background: #111a27;
+        color: #ffffff !important;
+        font-size: 0.72rem;
+        font-weight: 900;
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
     }
     .lg-kpi strong {
         display: block;
         margin-top: 6px;
-        font-size: 1.45rem;
+        font-size: 1.55rem;
         color: #1d2430;
         line-height: 1.1;
     }
@@ -356,11 +496,12 @@ CSS = """
         border-bottom: 0;
     }
     .lg-chart-card {
-        background: #ffffff;
-        border: 1px solid #dbe2ea;
-        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.95);
+        border: 1px solid rgba(201, 212, 226, 0.95);
+        border-radius: 12px;
         padding: 16px 16px 10px;
         margin-bottom: 14px;
+        box-shadow: 0 12px 26px rgba(15, 23, 42, 0.06);
     }
     .lg-chart-card h3 {
         color: #1d2430;
@@ -392,10 +533,24 @@ CSS = """
         }
         .lg-page-title {
             display: block;
+            min-height: 280px;
+            padding: 20px;
+            background-position: 58% center;
+        }
+        .lg-week-card {
+            margin-top: 18px;
+            min-width: 0;
+        }
+    }
+    @media (max-width: 560px) {
+        .lg-kpi-grid {
+            grid-template-columns: 1fr;
         }
     }
 </style>
 """
+
+CSS = CSS.replace("__COMMAND_CENTER_URI__", COMMAND_CENTER_URI)
 
 st.markdown(CSS, unsafe_allow_html=True)
 
@@ -515,18 +670,25 @@ def page_header(title: str, subtitle: str = ""):
     week_tip = (
         "Current simulation week, level, and business stage. Stages are based on MRR, active clients, and reputation."
     )
-    title_col, week_col = st.columns([3.5, 1], gap="large")
-    with title_col:
-        st.title(title)
-        if subtitle:
-            st.caption(subtitle)
-    with week_col:
-        st.metric(
-            "Current Week",
-            f"{state['week']}",
-            help=week_tip,
-        )
-        st.caption(f"Level {state['level']} - {state['stage']}")
+    xp_progress = min(100, int((state.get("xp", 0) % 250) / 250 * 100))
+    st.markdown(
+        f"""
+        <div class="lg-page-title">
+          <div>
+            <div class="lg-hero-eyebrow">Agency command center</div>
+            <h1>{escape(title)}</h1>
+            <p>{escape(subtitle) if subtitle else "Plan campaigns, manage capacity, and grow the agency one week at a time."}</p>
+          </div>
+          <div class="lg-week-card" title="{escape(week_tip, quote=True)}">
+            <div class="lg-small-label">Current week {tooltip_badge(week_tip)}</div>
+            <strong>Week {state['week']}</strong>
+            <div class="lg-subtle">Level {state['level']} - {escape(state['stage'])}</div>
+            <div class="lg-xp-track" aria-label="XP progress"><span style="width:{xp_progress}%"></span></div>
+          </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def kpi_grid(state):
@@ -535,27 +697,33 @@ def kpi_grid(state):
     lifetime_closed = state["metrics"].get("lifetime_clients_closed", 0)
     close_rate = lifetime_closed / lifetime_booked if lifetime_booked else 0
     items = [
-        ("Cash", money(state["cash"]), "Runway and survival"),
-        ("MRR", money(state["mrr"]), "Active recurring revenue"),
-        ("Expenses", money(state["monthly_expenses"]), "Monthly fixed burn"),
-        ("Weekly P/L", money(state.get("weekly_profit", 0)), "Last simulated week"),
-        ("Active Clients", f"{len(clients)}", "Delivery workload"),
-        ("Pipeline Leads", f"{state['pipeline'].get('leads', 0):,.0f}", "Raw generated demand"),
-        ("Booked Calls", f"{state['pipeline'].get('booked_calls', 0):,.0f}", "Sales opportunities"),
-        ("Close Rate", percent(close_rate), "Lifetime booked-to-client"),
-        ("Reputation", f"{state['reputation']:.0f}/100", "Trust and market signal"),
-        ("Founder Energy", f"{state['founder_energy']:.0f}/100", "Execution quality"),
-        ("Team Size", f"{len(state.get('team', []))}", "Capacity and payroll"),
-        ("Tool Stack", f"{len(state.get('tools', []))}", "Systems and subscriptions"),
+        ("Cash", "CASH", money(state["cash"]), "Runway and survival"),
+        ("MRR", "MRR", money(state["mrr"]), "Active recurring revenue"),
+        ("Expenses", "BURN", money(state["monthly_expenses"]), "Monthly fixed burn"),
+        ("Weekly P/L", "P/L", money(state.get("weekly_profit", 0)), "Last simulated week"),
+        ("Active Clients", "CLNT", f"{len(clients)}", "Delivery workload"),
+        ("Pipeline Leads", "LEAD", f"{state['pipeline'].get('leads', 0):,.0f}", "Raw generated demand"),
+        ("Booked Calls", "CALL", f"{state['pipeline'].get('booked_calls', 0):,.0f}", "Sales opportunities"),
+        ("Close Rate", "WIN", percent(close_rate), "Lifetime booked-to-client"),
+        ("Reputation", "REP", f"{state['reputation']:.0f}/100", "Trust and market signal"),
+        ("Founder Energy", "NRG", f"{state['founder_energy']:.0f}/100", "Execution quality"),
+        ("Team Size", "TEAM", f"{len(state.get('team', []))}", "Capacity and payroll"),
+        ("Tool Stack", "TOOL", f"{len(state.get('tools', []))}", "Systems and subscriptions"),
     ]
-    cols = st.columns(4)
-    for index, (label, value, hint) in enumerate(items):
+    cards = []
+    for label, code, value, hint in items:
         tooltip = KPI_TOOLTIPS.get(label, hint)
-        cols[index % 4].metric(
-            label,
-            value,
-            help=tooltip,
+        cards.append(
+            f'<div class="lg-kpi" title="{escape(tooltip, quote=True)}">'
+            f'<div class="lg-kpi-top">'
+            f'<span>{escape(label)} {tooltip_badge(tooltip)}</span>'
+            f'<span class="lg-kpi-code">{escape(code)}</span>'
+            f'</div>'
+            f'<strong>{escape(value)}</strong>'
+            f'<span>{escape(hint)}</span>'
+            f'</div>'
         )
+    st.markdown(f'<div class="lg-kpi-grid">{"".join(cards)}</div>', unsafe_allow_html=True)
 
 
 def history_df():
